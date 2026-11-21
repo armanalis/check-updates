@@ -1,10 +1,30 @@
-# Check Updates
+<p align="center">
+  <img src="icon-preview.png" width="128" alt="Check Updates icon">
+</p>
 
-Checks every app on your computer for updates and updates them with one click. Free, for Mac and Windows.
+<h1 align="center">Check Updates</h1>
 
-Bilgisayarındaki her uygulamanın güncellemesini kontrol eder ve tek tıkla günceller. Ücretsiz, Mac ve Windows için.
+<p align="center">
+  Checks every app on your computer for updates and updates them with one click. Free, for Mac and Windows.<br>
+  Bilgisayarındaki her uygulamanın güncellemesini kontrol eder ve tek tıkla günceller. Ücretsiz, Mac ve Windows için.
+</p>
 
-**Website:** https://check-updates.armanalis.workers.dev
+<p align="center">
+  <a href="https://check-updates.armanalis.workers.dev"><b>Website</b></a> ·
+  <a href="#install--kurulum">Install</a> ·
+  <a href="#how-it-works">How it works</a>
+</p>
+
+<table>
+  <tr>
+    <td width="62%"><img src="docs/screenshot-main.png" alt="Main window: list of apps with installed and latest versions, Update buttons and checkmarks"></td>
+    <td width="38%"><img src="docs/screenshot-settings.png" alt="Settings: choose App Store or web apps, language, and which apps to check"></td>
+  </tr>
+  <tr>
+    <td align="center">One list, one click: <b>Update All</b></td>
+    <td align="center">Pick what to check · English / Türkçe</td>
+  </tr>
+</table>
 
 ## Install / Kurulum
 

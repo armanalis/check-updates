@@ -459,7 +459,10 @@ struct ContentView: View {
         }
         .id(lang) // redraw every string when the language changes
         .frame(minWidth: 600, minHeight: 560)
-        .task { await checker.run() }
+        .task {
+            await checker.run()
+            await snapshotIfAsked()
+        }
         .sheet(isPresented: $showSettings, onDismiss: { Task { await checker.run() } }) {
             SettingsView(checker: checker)
         }
@@ -468,6 +471,20 @@ struct ContentView: View {
         } message: {
             Text(L("confirmMsg"))
         }
+    }
+
+    /// For README screenshots: `--snapshot main.png settings.png` saves both windows and quits.
+    /// The app draws its own windows, so no screen-recording permission is needed.
+    func snapshotIfAsked() async {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--snapshot"), i + 2 < args.count else { return }
+        try? await Task.sleep(for: .seconds(1))
+        guard let win = NSApp.windows.first(where: { $0.isVisible }) else { exit(1) }
+        savePNG(win, to: args[i + 1])
+        showSettings = true
+        try? await Task.sleep(for: .seconds(1.5))
+        if let sheet = win.attachedSheet { savePNG(sheet, to: args[i + 2]) }
+        exit(0)
     }
 
     @ViewBuilder func status(_ app: AppInfo, locked: Bool) -> some View {
@@ -616,4 +633,12 @@ func selfTest() {
     try? FileManager.default.removeItem(atPath: tmp + ".incomplete")
     precondition(percent(cache: tmp, total: 1000) == nil)
     print("selftest ok")
+}
+
+/// Renders a window (title bar included) into a PNG file.
+func savePNG(_ window: NSWindow, to path: String) {
+    guard let view = window.contentView?.superview ?? window.contentView,
+          let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+    view.cacheDisplay(in: view.bounds, to: rep)
+    try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
 }
