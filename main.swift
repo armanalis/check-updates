@@ -437,16 +437,19 @@ struct ContentView: View {
                     if checker.busy { ProgressView().controlSize(.small) }
                 }
                 Spacer()
-                Button(L("check")) { Task { await checker.run() } }
-                    .keyboardShortcut("r").disabled(locked)
-                Button(L("updateAll")) { confirmAll = true }
-                    .buttonStyle(.borderedProminent).disabled(locked || pending.isEmpty)
-                Link(destination: repoURL) {
-                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                VStack(alignment: .trailing, spacing: 6) {
+                    // small repo link above the buttons, not a button of its own
+                    Link("github.com/armanalis/check-updates", destination: repoURL)
+                        .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Button(L("check")) { Task { await checker.run() } }
+                            .keyboardShortcut("r").disabled(locked)
+                        Button(L("updateAll")) { confirmAll = true }
+                            .buttonStyle(.borderedProminent).disabled(locked || pending.isEmpty)
+                        Button { showSettings = true } label: { Image(systemName: "gearshape") }
+                            .keyboardShortcut(",").help(L("settings")).disabled(locked)
+                    }
                 }
-                .buttonStyle(.bordered).help("github.com/armanalis/check-updates")
-                Button { showSettings = true } label: { Image(systemName: "gearshape") }
-                    .keyboardShortcut(",").help(L("settings")).disabled(locked)
             }.padding()
             List(checker.apps) { app in
                 HStack(spacing: 10) {
