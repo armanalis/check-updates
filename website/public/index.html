@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check Updates — Bilgisayarındaki tüm uygulamaları tek tıkla güncelle (Mac ve Windows)</title>
+<meta name="description" content="Mac veya Windows bilgisayarındaki her uygulamanın güncellemesini tek tek kontrol eden, tek tuşla hepsini güncelleyen ücretsiz uygulama.">
+<link rel="icon" href="icon.png">
+<style>
+  :root {
+    --bg: #0c0f0d; --panel: #151a17; --line: #232b26; --text: #eef3ef; --muted: #93a198;
+    --green: #2fcf74; --green-dark: #0d7f59;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 17px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 28px; }
+  nav { display: flex; align-items: center; gap: 12px; padding: 22px 0; font-weight: 600; }
+  nav img { width: 34px; height: 34px; }
+
+  .hero { display: grid; grid-template-columns: 1.05fr 1fr; gap: 56px; align-items: center; padding: 64px 0 88px; }
+  h1 { font-size: clamp(40px, 5.4vw, 62px); line-height: 1.04; letter-spacing: -0.03em; margin: 0 0 20px; text-wrap: balance; }
+  h1 em { font-style: normal; color: var(--green); }
+  .lead { color: var(--muted); font-size: 19px; max-width: 30em; margin: 0 0 34px; }
+
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 15px 26px; border-radius: 14px;
+    font-weight: 650; font-size: 17px; text-decoration: none; border: 0; cursor: pointer; }
+  .btn-primary { background: var(--green); color: #04150c; }
+  .btn-primary:hover { background: #45e087; }
+  .btn-primary:focus-visible, .btn-ghost:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); cursor: not-allowed; }
+  .fine { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+  /* mock of the app window */
+  .window { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,.7); }
+  .bar { display: flex; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .bar i { width: 12px; height: 12px; border-radius: 50%; background: #3a423d; }
+  .head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 8px; }
+  .head b { font-size: 19px; }
+  .pill { background: var(--green); color: #04150c; font-size: 13px; font-weight: 650; padding: 6px 12px; border-radius: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 18px; border-top: 1px solid var(--line); }
+  .ico { width: 30px; height: 30px; border-radius: 8px; flex: none; }
+  .row div { flex: 1; }
+  .row small { display: block; color: var(--muted); font-size: 12.5px; }
+  .row .pct { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted); }
+  .spin { width: 14px; height: 14px; border: 2px solid #3a423d; border-top-color: var(--green); border-radius: 50%;
+    animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  .ok { color: var(--green); font-size: 18px; }
+  .upd { background: #1f6feb; color: #fff; font-size: 12.5px; font-weight: 600; padding: 5px 11px; border-radius: 7px; }
+
+  section { padding: 72px 0; border-top: 1px solid var(--line); }
+  h2 { font-size: 32px; letter-spacing: -0.02em; margin: 0 0 28px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .card h3 { margin: 0 0 8px; font-size: 18px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+  ol.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; max-width: 760px; }
+  ol.steps li { counter-increment: s; display: flex; gap: 16px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 18px 20px; }
+  ol.steps li::before { content: counter(s); flex: none; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--green-dark); display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+  code { background: #0a0d0b; border: 1px solid var(--line); border-radius: 8px; padding: 2px 7px; font-size: 14px; }
+  pre { background: #0a0d0b; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto;
+    font-size: 13.5px; margin: 10px 0 0; }
+  .note { color: var(--muted); font-size: 15px; margin-top: 18px; max-width: 760px; }
+  .cmd { display: flex; gap: 10px; align-items: stretch; margin-top: 10px; }
+  .cmd pre { flex: 1; margin: 0; user-select: all; }
+  .cmd button { flex: none; background: var(--green); color: #04150c; border: 0; border-radius: 10px; padding: 0 16px;
+    font: 600 14px/1 inherit; cursor: pointer; }
+  .cmd button:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  details summary { cursor: pointer; color: var(--text); }
+  details[open] summary { margin-bottom: 8px; }
+  html { scroll-behavior: smooth; }
+  footer { padding: 36px 0 52px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 28px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav><img src="icon.png" alt="">Check Updates</nav>
+
+  <header class="hero">
+    <div>
+      <h1>Bilgisayarındaki tüm uygulamalar, <em>tek tıkla güncel.</em></h1>
+      <p class="lead">Check Updates her uygulamayı tek tek kontrol eder, hangisinin güncellemesi olduğunu gösterir ve
+        hepsini tek tuşla günceller. WhatsApp, Chrome, Discord, Slack, Notion ve binlercesi.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="#mac">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+          Mac'e kur
+        </a>
+        <a class="btn btn-primary" href="#windows">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+          Windows'a kur
+        </a>
+      </div>
+      <p class="fine">Ücretsiz · Mac: macOS 13+, Apple Silicon ve Intel · Windows: 10 ve 11 · 50 KB – 600 KB</p>
+    </div>
+
+    <div class="window" aria-hidden="true">
+      <div class="bar"><i></i><i></i><i></i></div>
+      <div class="head"><b>Güncelleniyor 2/5</b><span class="pill">Hepsini Güncelle</span></div>
+      <div class="row"><span class="ico" style="background:#25d366"></span><div>WhatsApp<small>26.46.17 → 26.46.21 · Web</small></div><span class="ok">✓</span></div>
+      <div class="row"><span class="ico" style="background:#4285f4"></span><div>Google Chrome<small>157.0.8103 → 158.0.8127 · Web</small></div><span class="pct"><span class="spin"></span>%64</span></div>
+      <div class="row"><span class="ico" style="background:#5865f2"></span><div>Discord<small>0.0.422 → 0.0.423 · Web</small></div><span class="upd">Güncelle</span></div>
+      <div class="row"><span class="ico" style="background:#4a154b"></span><div>Slack<small>4.50.143 → 4.53.292 · Web</small></div><span class="upd">Güncelle</span></div>
+      <div class="row"><span class="ico" style="background:#fff"></span><div>Ollama<small>0.40.17 → 0.40.17 · Web</small></div><span class="ok">✓</span></div>
+    </div>
+  </header>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>Nasıl çalışır?</h2>
+    <div class="grid">
+      <div class="card"><h3>Her uygulamayı tarar</h3><p>Bilgisayarındaki her uygulamanın yüklü sürümünü okur.</p></div>
+      <div class="card"><h3>En son sürümü bulur</h3><p>Mac'te App Store, Homebrew ve uygulamaların kendi güncelleme kanallarına; Windows'ta Microsoft'un winget kataloğuna bakar.</p></div>
+      <div class="card"><h3>Tek tuşla günceller</h3><p>Yüzde ile indirme ilerlemesini gösterir. Açık uygulamaları kapatır, günceller ve tekrar açar.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="mac">
+  <div class="wrap">
+    <h2>Mac'e kur (1 dakika)</h2>
+    <ol class="steps">
+      <li><div><b>⌘ + Boşluk</b>'a bas, <b>Terminal</b> yaz ve Enter'a bas.</div></li>
+      <li><div>Bu komutu kopyala, Terminal'e yapıştır ve Enter'a bas:
+        <div class="cmd"><pre id="cmd-mac">curl -fsSL https://check-updates.armanalis.workers.dev/install.sh | sh</pre><button type="button" data-copy="cmd-mac">Kopyala</button></div></div></li>
+      <li><div>Check Updates kendiliğinden açılır ve kontrol eder. <b>Hepsini Güncelle</b>'ye bas. Sonraki açılışlarda Spotlight'ta "Check Updates" yazman yeterli.</div></li>
+    </ol>
+    <p class="note">Komut sadece uygulamayı indirip Uygulamalar klasörüne koyar; ne yaptığını <a href="install.sh" style="color:var(--green)">buradan okuyabilirsin</a>.
+      Web'den indirilen uygulamaları otomatik güncellemek için <a href="https://brew.sh" style="color:var(--green)">Homebrew</a> gerekir; yoksa Check Updates uygulamanın kendi sitesini açar.</p>
+    <details class="note"><summary>Terminal kullanmadan kurmak istersen</summary>
+      <a href="CheckUpdates.zip" download style="color:var(--green)">CheckUpdates.zip</a>'i indir, aç ve uygulamayı Uygulamalar'a sürükle. Açarken "doğrulanamadı" uyarısı çıkarsa
+      <b>Bitti</b>'ye bas, <b>Sistem Ayarları → Gizlilik ve Güvenlik</b>'te en alttaki <b>Yine de Aç</b>'a bas.</details>
+  </div>
+</section>
+
+<section id="windows">
+  <div class="wrap">
+    <h2>Windows'a kur (1 dakika)</h2>
+    <ol class="steps">
+      <li><div><b>Başlat</b> menüsüne <b>PowerShell</b> yaz ve aç (yönetici olarak açmana gerek yok).</div></li>
+      <li><div>Bu komutu kopyala, PowerShell'e yapıştır (sağ tık) ve Enter'a bas:
+        <div class="cmd"><pre id="cmd-win">irm https://check-updates.armanalis.workers.dev/install.ps1 | iex</pre><button type="button" data-copy="cmd-win">Kopyala</button></div></div></li>
+      <li><div>Check Updates kendiliğinden açılır. Sonraki açılışlarda Başlat menüsünde "Check Updates" yazman yeterli. Bazı uygulamalar güncellenirken yönetici izni ister, <b>Evet</b> de.</div></li>
+    </ol>
+    <p class="note">Windows 10 ve 11'de hazır gelen winget'i kullanır. Komutun ne yaptığını <a href="install.ps1" style="color:var(--green)">buradan okuyabilirsin</a>.</p>
+    <details class="note"><summary>PowerShell kullanmadan kurmak istersen</summary>
+      <a href="CheckUpdates.exe" download style="color:var(--green)">CheckUpdates.exe</a>'yi indir ve çift tıkla. "Windows bilgisayarınızı korudu" çıkarsa
+      <b>Ek bilgi</b> → <b>Yine de çalıştır</b>'a bas.</details>
+  </div>
+</section>
+
+<footer><div class="wrap">Check Updates · Ücretsiz · Mac ve Windows için · <a href="https://github.com/armanalis/check-updates" style="color:var(--green)">github.com/armanalis</a></div></footer>
+<script src="copy.js"></script>
+</body>
+</html>

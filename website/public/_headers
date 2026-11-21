@@ -1,0 +1,27 @@
+# Cloudflare Pages security headers. The page has no JavaScript, so scripts are blocked entirely.
+/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+
+/CheckUpdates.zip
+  Content-Type: application/zip
+  Content-Disposition: attachment; filename="CheckUpdates.zip"
+  Cache-Control: no-cache
+
+/CheckUpdates.exe
+  Content-Type: application/vnd.microsoft.portable-executable
+  Content-Disposition: attachment; filename="CheckUpdates.exe"
+  Cache-Control: no-cache
+
+/install.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
+
+/install.ps1
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache

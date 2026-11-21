@@ -1,0 +1,15 @@
+.DS_Store
+.claude/
+
+# build output (recreated by build.sh / windows/build.sh)
+build.noindex/
+windows/bin/
+windows/obj/
+windows/tests/bin/
+windows/tests/obj/
+website/public/CheckUpdates.zip
+website/public/CheckUpdates.exe
+
+# deploy tool state (contains account/project IDs)
+website/.vercel/
+website/.wrangler/
