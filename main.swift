@@ -58,6 +58,8 @@ func L(_ key: String) -> String {
 func L(_ key: String, _ args: CVarArg...) -> String { String(format: L(key), arguments: args) }
 func pctText(_ p: Double) -> String { isTurkish() ? "%\(Int(p))" : "\(Int(p))%" }
 
+let repoURL = URL(string: "https://github.com/armanalis/check-updates")!
+
 // MARK: - Model
 
 enum Source { case appStore, web, sparkle, unknown
@@ -226,9 +228,11 @@ func check(_ app: AppInfo, casks: [String: Cask]) async -> AppInfo {
 
 enum Pref {
     static var d: UserDefaults { .standard }
-    static var checkMAS: Bool { d.object(forKey: "checkMAS") as? Bool ?? true }
-    static var checkWeb: Bool { d.object(forKey: "checkWeb") as? Bool ?? true }
-    static var showUnknown: Bool { d.object(forKey: "showUnknown") as? Bool ?? true }
+    // bool(forKey:) also understands "YES"/"NO" strings (e.g. from command-line arguments); default is on
+    static func flag(_ k: String) -> Bool { d.object(forKey: k) == nil ? true : d.bool(forKey: k) }
+    static var checkMAS: Bool { flag("checkMAS") }
+    static var checkWeb: Bool { flag("checkWeb") }
+    static var showUnknown: Bool { flag("showUnknown") }
     static var ignored: Set<String> { Set((d.string(forKey: "ignored") ?? "").split(separator: "\n").map(String.init)) }
 }
 
@@ -437,6 +441,10 @@ struct ContentView: View {
                     .keyboardShortcut("r").disabled(locked)
                 Button(L("updateAll")) { confirmAll = true }
                     .buttonStyle(.borderedProminent).disabled(locked || pending.isEmpty)
+                Link(destination: repoURL) {
+                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                .buttonStyle(.bordered).help("github.com/armanalis/check-updates")
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .keyboardShortcut(",").help(L("settings")).disabled(locked)
             }.padding()
@@ -473,17 +481,22 @@ struct ContentView: View {
         }
     }
 
-    /// For README screenshots: `--snapshot main.png settings.png` saves both windows and quits.
+    /// For README screenshots: `--snapshot-dir=/path` saves main.png and settings.png there and quits.
     /// The app draws its own windows, so no screen-recording permission is needed.
+    /// (One dash-prefixed argument on purpose: macOS treats a bare path argument as a document to open
+    /// and then skips creating the main window.)
     func snapshotIfAsked() async {
-        let args = CommandLine.arguments
-        guard let i = args.firstIndex(of: "--snapshot"), i + 2 < args.count else { return }
+        guard let arg = CommandLine.arguments.first(where: { $0.hasPrefix("--snapshot-dir=") }) else { return }
+        let dir = String(arg.dropFirst("--snapshot-dir=".count))
         try? await Task.sleep(for: .seconds(1))
         guard let win = NSApp.windows.first(where: { $0.isVisible }) else { exit(1) }
-        savePNG(win, to: args[i + 1])
+        NSApp.activate(ignoringOtherApps: true) // inactive windows draw gray buttons
+        win.makeKeyAndOrderFront(nil)
+        try? await Task.sleep(for: .seconds(0.5))
+        savePNG(win, to: dir + "/main.png")
         showSettings = true
         try? await Task.sleep(for: .seconds(1.5))
-        if let sheet = win.attachedSheet { savePNG(sheet, to: args[i + 2]) }
+        if let sheet = win.attachedSheet { savePNG(sheet, to: dir + "/settings.png") }
         exit(0)
     }
 
@@ -569,7 +582,7 @@ struct SettingsView: View {
                 } header: { Text(L("apps")) } footer: { Text(L("appsHint")) }
                 Section(L("about")) {
                     LabeledContent("Check Updates", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
-                    Link("github.com/armanalis", destination: URL(string: "https://github.com/armanalis")!)
+                    Link("github.com/armanalis/check-updates", destination: repoURL)
                 }
             }
             .formStyle(.grouped)

@@ -60,6 +60,10 @@ windows/build.sh      # Windows exe → website/public/CheckUpdates.exe (needs .
 
 Deploy the website (Cloudflare Workers): `cd website && npx wrangler deploy`
 
+## License
+
+[MIT](LICENSE) © 2026 Ali Arman Dai. Free to use, change and share.
+
 ---
 
 Made by [armanalis](https://github.com/armanalis)
