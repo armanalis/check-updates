@@ -37,6 +37,9 @@ let strings: [String: (en: String, tr: String)] = [
     "cancelled": ("Password was not entered", "Şifre girilmedi"),
     "failed": ("Update failed", "Güncellenemedi"),
     "retry": ("Retry", "Tekrar Dene"),
+    "hide": ("Hide from List", "Listeden Kaldır"),
+    "hideShort": ("Hide", "Kaldır"),
+    "hideHelp": ("Stops checking this app. Turn it back on in Settings.", "Bu uygulama artık kontrol edilmez. Ayarlar'dan tekrar açabilirsin."),
     "openSite": ("Website", "Siteyi Aç"),
     "askpass": ("Check Updates needs your Mac password to update %@.", "Check Updates, %@ güncellemesi için Mac şifreni istiyor."),
     "settings": ("Settings", "Ayarlar"),
@@ -503,6 +506,16 @@ enum UpdateState { case working(Double?), updated, inAppStore, inApp, failed(Fai
 
     func updateAll() async { await updateList(apps.filter(\.hasUpdate)) }
 
+    /// Same list Settings → Apps edits, so the user can bring it back there.
+    func hide(_ app: AppInfo) {
+        let d = UserDefaults.standard
+        var set = Pref.ignored
+        set.insert(app.bundleID)
+        d.set(set.sorted().joined(separator: "\n"), forKey: "ignored")
+        apps.removeAll { $0.bundleID == app.bundleID }
+        state[app.bundleID] = nil
+    }
+
     func updateList(_ list: [AppInfo], withPassword: Bool = false) async {
         guard updating == nil else { return }
         list.forEach { state[$0.bundleID] = nil }
@@ -539,12 +552,16 @@ enum UpdateState { case working(Double?), updated, inAppStore, inApp, failed(Fai
                 try? await Task.sleep(for: .milliseconds(300))
             }
         }
+        // Apps owned by root (pkg installs like Zoom, Teams, Shottr) always need the password, so ask right away
+        // instead of failing first and making the user press "Try with Password".
+        let owner = (try? FileManager.default.attributesOfItem(atPath: app.url.path)[.ownerAccountID] as? NSNumber)?.uint32Value
+        let needsPassword = withPassword || (owner != nil && owner != getuid())
         // --force replaces the existing app even if it was installed by hand; settings in ~/Library are kept.
-        let askpass = withPassword ? makeAskpass(appName: app.name) : nil
+        let askpass = needsPassword ? makeAskpass(appName: app.name) : nil
         let (ok, log) = await runBrew(["install", "--cask", "--force", cask], askpass: askpass)
         poller.cancel()
         if let askpass { try? FileManager.default.removeItem(atPath: askpass) }
-        state[id] = ok ? .updated : .failed(classify(log, usedPassword: withPassword))
+        state[id] = ok ? .updated : .failed(classify(log, usedPassword: needsPassword))
         if q.wasRunning { NSWorkspace.shared.open(app.url) }
     }
 }
@@ -598,7 +615,11 @@ struct ContentView: View {
                     }
                     Spacer()
                     status(app, locked: locked)
-                }.padding(.vertical, 2)
+                }
+                .padding(.vertical, 2)
+                .contextMenu {
+                    Button(L("hide")) { checker.hide(app) }.disabled(locked)
+                }
             }
         }
         .id(lang) // redraw every string when the language changes
@@ -651,6 +672,8 @@ struct ContentView: View {
             Label(L("inApp"), systemImage: "arrow.up.forward.app").foregroundStyle(.secondary)
         case .failed(let f):
             HStack(spacing: 6) {
+                Button(L("hideShort")) { checker.hide(app) }
+                    .help(L("hideHelp")).disabled(locked)
                 if let link = app.link, f != .needsAdmin {
                     Button(L("openSite")) { NSWorkspace.shared.open(link) }
                 }
