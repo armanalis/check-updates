@@ -212,14 +212,28 @@ func sparkleLatest(_ feed: String) async -> String? {
     return found.max { isNewer($1, than: $0) }
 }
 
+/// Apps whose Sparkle feed is set in code instead of Info.plist (found in the app binary).
+// shortcut: hand-maintained; add an entry when an app's own updater is ahead of Homebrew and has no SUFeedURL.
+let knownFeeds = [
+    "net.whatsapp.WhatsApp": "https://web.whatsapp.com/desktop/mac_native/updates/",
+]
+
 func check(_ app: AppInfo, casks: [String: Cask]) async -> AppInfo {
     var a = app
-    if a.isMAS, let (v, link) = await appStoreLatest(a.bundleID) {
-        (a.latest, a.source, a.link) = (v, .appStore, link)
-    } else if let c = casks[a.url.lastPathComponent] {
+    if a.isMAS {
+        if let (v, link) = await appStoreLatest(a.bundleID) { (a.latest, a.source, a.link) = (v, .appStore, link) }
+        return a
+    }
+    if let c = casks[a.url.lastPathComponent] {
         (a.latest, a.source, a.link, a.cask, a.caskURL) = (c.version.split(separator: ",").first.map(String.init), .web, c.homepage, c.token, c.url)
-    } else if let feed = a.feedURL, let v = await sparkleLatest(feed) {
-        (a.latest, a.source) = (v, .sparkle)
+    }
+    // Homebrew's catalog can lag the app's own updater by days (WhatsApp: brew 26.46.21, app feed 26.47.12),
+    // so also ask the app's feed and keep whichever is newer.
+    if let feed = a.feedURL ?? knownFeeds[a.bundleID], let v = await sparkleLatest(feed),
+       a.latest.map({ isNewer(v, than: $0) }) ?? true {
+        a.latest = v
+        a.source = .sparkle
+        a.cask = nil // brew would install its older version; the app's own updater gets the new one
     }
     return a
 }
