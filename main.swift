@@ -26,6 +26,7 @@ let strings: [String: (en: String, tr: String)] = [
     "inAppStore": ("In App Store", "App Store'da"),
     "inApp": ("Update in app", "Uygulamada güncelle"),
     "unknown": ("Unknown", "Bilinmiyor"),
+    "appFeed": ("App", "Uygulama"),
     "confirmTitle": ("Update %d apps?", "%d uygulama güncellensin mi?"),
     "confirmMsg": ("Open apps are closed, updated and reopened. Save any unsaved work first.",
                    "Açık olan uygulamalar kapatılıp güncellendikten sonra yeniden açılır. Kaydedilmemiş işin varsa önce kaydet."),
@@ -64,7 +65,7 @@ let repoURL = URL(string: "https://github.com/armanalis/check-updates")!
 
 enum Source { case appStore, web, sparkle, unknown
     var label: String {
-        switch self { case .appStore: "App Store"; case .web: "Web"; case .sparkle: "Sparkle"; case .unknown: L("unknown") }
+        switch self { case .appStore: "App Store"; case .web: "Web"; case .sparkle: L("appFeed"); case .unknown: L("unknown") }
     }
 }
 
@@ -78,6 +79,7 @@ struct AppInfo: Identifiable {
     var link: URL? = nil
     var caskURL: URL? = nil
     var cask: String? = nil // Homebrew token, lets "Update" install the new version itself
+    var sources: [String: String] = [:] // every version found, by source name (for --audit)
 
     // shortcut: an app whose short version lacks a patch number (e.g. "1.2" + build "500") can hide a "1.2.1" update; fine for real-world apps.
     var hasUpdate: Bool {
@@ -152,21 +154,29 @@ struct Cask { let token: String, version: String, homepage: URL?, url: URL? }
 func loadCasks() async -> [String: Cask] {
     guard let (data, _) = try? await URLSession.shared.data(from: URL(string: "https://formulae.brew.sh/api/cask.json")!),
           let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [:] }
-    var out: [String: Cask] = [:]
+    var out: [String: Cask] = [:], fromPkg: [String: Cask] = [:]
     for c in list {
         guard let token = c["token"] as? String, let version = c["version"] as? String, version != "latest" else { continue }
         let isVariant = token.contains("@") // "whatsapp@beta" must not override "whatsapp"
+        let cask = Cask(token: token, version: version, homepage: (c["homepage"] as? String).flatMap(URL.init(string:)), url: (c["url"] as? String).flatMap(URL.init(string:)))
         for art in c["artifacts"] as? [[String: Any]] ?? [] {
             for app in art["app"] as? [Any] ?? [] {
                 guard let name = app as? String else { continue }
-                if isVariant && out[name] != nil { continue }
-                if !isVariant || out[name] == nil {
-                    out[name] = Cask(token: token, version: version, homepage: (c["homepage"] as? String).flatMap(URL.init(string:)), url: (c["url"] as? String).flatMap(URL.init(string:)))
+                if !isVariant || out[name] == nil { out[name] = cask }
+            }
+            // pkg installers (Zoom, Teams) have no "app" entry, but their uninstall step names the app they put in /Applications
+            for key in ["uninstall", "zap"] {
+                for step in art[key] as? [[String: Any]] ?? [] {
+                    let deletes = (step["delete"] as? [String]) ?? (step["delete"] as? String).map { [$0] } ?? []
+                    for path in deletes where path.hasPrefix("/Applications/") && path.hasSuffix(".app") && !path.contains("*") {
+                        let name = String(path.dropFirst("/Applications/".count))
+                        if !name.contains("/"), !isVariant || fromPkg[name] == nil { fromPkg[name] = cask }
+                    }
                 }
             }
         }
     }
-    return out
+    return out.merging(fromPkg) { app, _ in app } // a real "app" entry wins over an uninstall path
 }
 
 func appStoreLatest(_ bundleID: String) async -> (String, URL?)? {
@@ -205,32 +215,141 @@ func macStoreVersion(id: Int, country: String) async -> String? {
 func sparkleLatest(_ feed: String) async -> String? {
     guard let url = URL(string: feed), let (data, _) = try? await URLSession.shared.data(from: url),
           let text = String(data: data, encoding: .utf8) else { return nil }
+    return sparkleLatest(xml: text)
+}
+
+/// Newest release in a Sparkle feed, ignoring beta/nightly items (they carry <sparkle:channel>).
+func sparkleLatest(xml text: String) -> String? {
+    guard text.contains("<rss") || text.contains("sparkle") else { return nil }
     let re = try! NSRegularExpression(pattern: #"shortVersionString(?:="|>)([^"<]+)"#)
-    let found = re.matches(in: text, range: NSRange(text.startIndex..., in: text)).compactMap {
-        Range($0.range(at: 1), in: text).map { String(text[$0]).trimmingCharacters(in: .whitespaces) }
-    }
+    let looksLikeVersion = try! NSRegularExpression(pattern: #"^\d+(\.\d+)+"#) // skips nightlies like "663205b5 (2024-12-20)"
+    let found = text.components(separatedBy: "<item").dropFirst()
+        .filter { !$0.contains("<sparkle:channel>") && !$0.contains("sparkle:channel=") }
+        .flatMap { item in
+            re.matches(in: item, range: NSRange(item.startIndex..., in: item)).compactMap {
+                Range($0.range(at: 1), in: item).map { String(item[$0]).trimmingCharacters(in: .whitespaces) }
+            }
+        }
+        .filter { looksLikeVersion.firstMatch(in: $0, range: NSRange($0.startIndex..., in: $0)) != nil }
     return found.max { isNewer($1, than: $0) }
 }
 
-/// Apps whose Sparkle feed is set in code instead of Info.plist (found in the app binary).
-// shortcut: hand-maintained; add an entry when an app's own updater is ahead of Homebrew and has no SUFeedURL.
-let knownFeeds = [
-    "net.whatsapp.WhatsApp": "https://web.whatsapp.com/desktop/mac_native/updates/",
-]
+// MARK: - Finding an app's own update feed
+
+/// Every "https://..." string inside a binary file.
+func httpsURLs(in data: Data) -> Set<String> {
+    let needle = Array("https://".utf8)
+    let allowed = Set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~:/?#@!$&'()*+,;=%".utf8)
+    var out = Set<String>()
+    data.withUnsafeBytes { (buf: UnsafeRawBufferPointer) in
+        guard let base = buf.baseAddress else { return }
+        let n = buf.count
+        var i = 0
+        while i + needle.count < n {
+            guard let hit = memchr(base + i, Int32(needle[0]), n - i - needle.count) else { break }
+            i = base.distance(to: UnsafeRawPointer(hit))
+            if memcmp(base + i, needle, needle.count) == 0 {
+                var j = i + needle.count
+                while j < n, allowed.contains(buf[j]) { j += 1 }
+                if (12...300).contains(j - i) { out.insert(String(decoding: buf[i..<j], as: UTF8.self)) }
+                i = j
+            } else { i += 1 }
+        }
+    }
+    return out
+}
+
+/// URLs in the app's binaries that look like update feeds, best guesses first.
+func feedCandidates(in appURL: URL) -> [String] {
+    let contents = appURL.appendingPathComponent("Contents")
+    var files: [URL] = []
+    if let exe = NSDictionary(contentsOf: contents.appendingPathComponent("Info.plist"))?["CFBundleExecutable"] as? String {
+        files.append(contents.appendingPathComponent("MacOS/" + exe))
+    }
+    let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
+    if let e = FileManager.default.enumerator(at: contents.appendingPathComponent("Frameworks"), includingPropertiesForKeys: keys) {
+        for case let f as URL in e where files.count < 60 {
+            if e.level > 5 { e.skipDescendants(); continue }
+            guard let v = try? f.resourceValues(forKeys: Set(keys)), v.isRegularFile == true,
+                  let size = v.fileSize, (100_000...400_000_000).contains(size) else { continue }
+            files.append(f)
+        }
+    }
+    var urls = Set<String>()
+    for f in files {
+        if let d = try? Data(contentsOf: f, options: .alwaysMapped) { urls.formUnion(httpsURLs(in: d)) }
+    }
+    func score(_ u: String) -> Int {
+        let l = u.lowercased()
+        return (l.contains("appcast") ? 4 : 0) + (l.contains("update") ? 2 : 0) + (l.hasSuffix(".xml") ? 1 : 0) + (l.contains("feed") ? 1 : 0)
+    }
+    return urls
+        .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: ".,;:)'")) }
+        .filter { score($0) > 0 && !$0.contains("sparkle-project.org") && !$0.contains("apple.com/DTDs") && !$0.contains("%") }
+        .sorted { (score($0), $1) > (score($1), $0) }
+}
+
+/// Finds a Sparkle feed even when the app keeps it out of Info.plist (WhatsApp, Ghostty) and remembers the answer
+/// per app version, so each app's files are only read once.
+func discoverFeed(_ app: AppInfo) async -> String? {
+    let key = "feed2.\(app.bundleID).\(app.version)"
+    if let cached = UserDefaults.standard.string(forKey: key) { return cached.isEmpty ? nil : cached }
+    let candidates = await Task.detached(priority: .utility) { feedCandidates(in: app.url) }.value
+    var found: String?
+    for url in candidates.prefix(6) {
+        // must answer like a feed AND be about this app: same major version family, not some bundled library's feed
+        if let v = await sparkleLatest(url), let new = versionParts(v).first, let old = versionParts(app.version).first,
+           (old...old + 2).contains(new) { found = url; break }
+    }
+    UserDefaults.standard.set(found ?? "", forKey: key)
+    return found
+}
+
+/// Electron apps built with electron-builder ship app-update.yml, which says where their releases live.
+func electronFeedURL(yml: String) -> URL? {
+    func val(_ k: String) -> String? {
+        yml.split(whereSeparator: \.isNewline).first { $0.hasPrefix(k + ":") }
+            .map { $0.dropFirst(k.count + 1).trimmingCharacters(in: CharacterSet(charactersIn: " '\"")) }
+    }
+    let file = (val("channel") ?? "latest") + "-mac.yml"
+    switch val("provider") {
+    case "generic": return val("url").flatMap { URL(string: $0.hasSuffix("/") ? $0 + file : $0 + "/" + file) }
+    case "github":
+        guard let o = val("owner"), let r = val("repo") else { return nil }
+        return URL(string: "https://github.com/\(o)/\(r)/releases/latest/download/\(file)")
+    default: return nil
+    }
+}
+
+func electronLatest(_ app: AppInfo) async -> String? {
+    guard let yml = try? String(contentsOf: app.url.appendingPathComponent("Contents/Resources/app-update.yml"), encoding: .utf8),
+          let url = electronFeedURL(yml: yml),
+          let (data, resp) = try? await URLSession.shared.data(from: url), (resp as? HTTPURLResponse)?.statusCode == 200,
+          let text = String(data: data, encoding: .utf8),
+          let line = text.split(whereSeparator: \.isNewline).first(where: { $0.hasPrefix("version:") }) else { return nil }
+    return line.dropFirst("version:".count).trimmingCharacters(in: CharacterSet(charactersIn: " '\""))
+}
 
 func check(_ app: AppInfo, casks: [String: Cask]) async -> AppInfo {
     var a = app
     if a.isMAS {
-        if let (v, link) = await appStoreLatest(a.bundleID) { (a.latest, a.source, a.link) = (v, .appStore, link) }
+        if let (v, link) = await appStoreLatest(a.bundleID) {
+            (a.latest, a.source, a.link) = (v, .appStore, link)
+            a.sources["App Store"] = v
+        }
         return a
     }
     if let c = casks[a.url.lastPathComponent] {
         (a.latest, a.source, a.link, a.cask, a.caskURL) = (c.version.split(separator: ",").first.map(String.init), .web, c.homepage, c.token, c.url)
+        a.sources["Homebrew"] = a.latest
     }
-    // Homebrew's catalog can lag the app's own updater by days (WhatsApp: brew 26.46.21, app feed 26.47.12),
-    // so also ask the app's feed and keep whichever is newer.
-    if let feed = a.feedURL ?? knownFeeds[a.bundleID], let v = await sparkleLatest(feed),
-       a.latest.map({ isNewer(v, than: $0) }) ?? true {
+    // Homebrew's catalog can lag an app's own updater by days (WhatsApp: brew 26.46.21, app 26.47.12),
+    // so also ask the app itself and keep whichever is newer.
+    var own: String?
+    if let feed = a.feedURL, let v = await sparkleLatest(feed) { own = v; a.sources["Sparkle (Info.plist)"] = v }
+    else if let feed = await discoverFeed(a), let v = await sparkleLatest(feed) { own = v; a.sources["Sparkle (found in app)"] = v }
+    if own == nil, let v = await electronLatest(a) { own = v; a.sources["Electron app-update.yml"] = v }
+    if let v = own, a.latest.map({ isNewer(v, than: $0) }) ?? true {
         a.latest = v
         a.source = .sparkle
         a.cask = nil // brew would install its older version; the app's own updater gets the new one
@@ -613,6 +732,19 @@ struct SettingsView: View {
 @main struct CheckUpdatesApp: App {
     init() {
         if CommandLine.arguments.contains("--selftest") { selfTest(); exit(0) }
+        if CommandLine.arguments.contains("--audit") { // which sources answered for each app, and where they disagree
+            Task { @MainActor in
+                let c = Checker(); await c.run()
+                for a in c.apps.sorted(by: { $0.name < $1.name }) {
+                    let vals = Set(a.sources.values.map { versionParts($0) })
+                    let flag = a.sources.isEmpty ? "NONE    " : vals.count > 1 ? "DIFFER  " : a.sources.count == 1 ? "1 source" : "agree   "
+                    let detail = a.sources.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: "  ")
+                    print(flag, a.hasUpdate ? "⬆️" : "  ", a.name, a.version, "→", a.latest ?? "-", " |", detail)
+                }
+                exit(0)
+            }
+            RunLoop.main.run()
+        }
         if CommandLine.arguments.contains("--list") { // terminal output, for debugging
             Task { @MainActor in
                 let c = Checker(); await c.run()
@@ -657,6 +789,19 @@ func selfTest() {
     precondition(classify("sudo: a terminal is required to read the password", usedPassword: false) == .needsAdmin)
     precondition(classify("curl: (6) Could not resolve host: github.com", usedPassword: false) == .network)
     precondition(classify("Error: shottr: something odd", usedPassword: false) == .other("shottr: something odd"))
+    precondition(httpsURLs(in: Data("xx\0https://web.whatsapp.com/desktop/mac_native/updates\0yy https://a.b/c".utf8))
+                 == ["https://web.whatsapp.com/desktop/mac_native/updates", "https://a.b/c"])
+    let feedXML = """
+    <rss><channel><item><sparkle:shortVersionString>2.0</sparkle:shortVersionString></item>
+    <item><sparkle:channel>beta</sparkle:channel><sparkle:shortVersionString>3.0-beta</sparkle:shortVersionString></item>
+    <item><enclosure sparkle:shortVersionString="1.9"/></item></channel></rss>
+    """
+    precondition(sparkleLatest(xml: feedXML) == "2.0")
+    precondition(sparkleLatest(xml: "<rss><item><sparkle:shortVersionString>663205b5 (2024-12-20)</sparkle:shortVersionString></item><item><sparkle:shortVersionString>1.4.0</sparkle:shortVersionString></item></rss>") == "1.4.0")
+    precondition(electronFeedURL(yml: "provider: generic\nurl: 'https://desktop-release.notion-static.com'\nchannel: arm64\n")?.absoluteString
+                 == "https://desktop-release.notion-static.com/arm64-mac.yml")
+    precondition(electronFeedURL(yml: "owner: acme\nrepo: app\nprovider: github\n")?.absoluteString
+                 == "https://github.com/acme/app/releases/latest/download/latest-mac.yml")
     let tmp = NSTemporaryDirectory() + "cu-selftest"
     FileManager.default.createFile(atPath: tmp + ".incomplete", contents: Data(count: 250))
     precondition(percent(cache: tmp, total: 1000) == 25)

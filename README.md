@@ -44,11 +44,17 @@ irm https://check-updates.armanalis.workers.dev/install.ps1 | iex
 
 | | Mac | Windows |
 |---|---|---|
-| Finds latest versions | App Store, [Homebrew](https://brew.sh) cask catalog, Sparkle feeds | `winget upgrade` |
+| Finds latest versions | App Store, [Homebrew](https://brew.sh) cask catalog, and the app's own update feed (Sparkle feed from Info.plist or found inside the app, electron-builder `app-update.yml`). The newest answer wins. | `winget upgrade` |
 | Updates | `brew install --cask --force`, App Store, or the app's own updater | `winget upgrade --id` |
 | Code | [`main.swift`](main.swift) (SwiftUI) | [`windows/`](windows) (C#, WinForms, .NET Framework 4.8) |
 
 Nothing is sent anywhere except version lookups to Apple, Homebrew and the apps' own update feeds.
+
+Check which source answered for every app, and where they disagree:
+
+```bash
+"/Applications/Check Updates.app/Contents/MacOS/CheckUpdates" --audit
+```
 
 ## Build
 
