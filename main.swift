@@ -89,7 +89,9 @@ struct AppInfo: Identifiable {
         guard let l = latest else { return false }
         var installed = [version, "\(version).\(build)"]
         // some apps keep the full version only in the build number (Opera: "140.0" + "140.0.6074.36")
-        if build.contains("."), versionParts(build).first == versionParts(version).first { installed.append(build) }
+        // only when the build extends the short version ("140.0" → "140.0.6074.36"), not Prime Video's "10.157" + "10.15700.144"
+        let v = versionParts(version), b = versionParts(build)
+        if b.count > v.count, Array(b.prefix(v.count)) == v { installed.append(build) }
         return installed.allSatisfy { isNewer(l, than: $0) }
     }
 }
@@ -500,9 +502,12 @@ enum UpdateState { case working(Double?), updated, inAppStore, inApp, failed(Fai
             return done
         }
         .filter { showUnknown || $0.latest != nil }
-        .sorted { ($0.hasUpdate ? 0 : 1, $0.name.lowercased()) < ($1.hasUpdate ? 0 : 1, $1.name.lowercased()) }
+        .sorted { (rank($0), $0.name.lowercased()) < (rank($1), $1.name.lowercased()) }
         busy = false
     }
+
+    /// Updates first, then up-to-date apps, then apps whose latest version couldn't be found.
+    func rank(_ a: AppInfo) -> Int { a.hasUpdate ? 0 : a.latest != nil ? 1 : 2 }
 
     func updateAll() async { await updateList(apps.filter(\.hasUpdate)) }
 
@@ -807,6 +812,12 @@ func selfTest() {
     var o = AppInfo(name: "Opera", url: URL(fileURLWithPath: "/x"), bundleID: "o", version: "140.0", build: "140.0.6074.36", isMAS: false, feedURL: nil)
     o.latest = "140.0.6074.36"; precondition(!o.hasUpdate)
     o.latest = "141.0.1"; precondition(o.hasUpdate)
+    var pv = AppInfo(name: "Prime Video", url: URL(fileURLWithPath: "/x"), bundleID: "p", version: "10.157", build: "10.15700.144", isMAS: true, feedURL: nil)
+    pv.latest = "10.158"; precondition(pv.hasUpdate)
+    pv.latest = "10.157"; precondition(!pv.hasUpdate)
+    var zm = AppInfo(name: "zoom", url: URL(fileURLWithPath: "/x"), bundleID: "z", version: "7.2.5 (90525)", build: "7.2.5.90525", isMAS: false, feedURL: nil)
+    zm.latest = "7.2.5.90525"; precondition(!zm.hasUpdate)
+    zm.latest = "7.3.0.1"; precondition(zm.hasUpdate)
     var sh = AppInfo(name: "Shottr", url: URL(fileURLWithPath: "/x"), bundleID: "s", version: "1.9.3", build: "137", isMAS: false, feedURL: nil)
     sh.latest = "1.10.0"; precondition(sh.hasUpdate)
     precondition(classify("sudo: a terminal is required to read the password", usedPassword: false) == .needsAdmin)
