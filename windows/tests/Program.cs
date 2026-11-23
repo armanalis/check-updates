@@ -35,4 +35,33 @@ Check(Winget.ParseUpgradeTable("No installed package found matching input criter
 Check(Winget.LastPercent("  ██████████              45%") == 45, "pct");
 Check(Math.Abs(Winget.LastPercent("██ 10%\r  ████  20.0 MB / 80.0 MB").Value - 25) < 0.01, "size");
 Check(Winget.LastPercent("Starting package install...") == null, "none");
+// Settings: round trip, defaults, junk lines ignored
+var st = new Settings { Lang = "tr", StoreApps = false };
+st.Hidden.Add("Zoom.Zoom"); st.Hidden.Add("Microsoft.Teams");
+var st2 = Settings.Parse(st.Serialize());
+Check(st2.Lang == "tr" && !st2.StoreApps && st2.OtherApps && st2.Hidden.SetEquals(new[] { "Zoom.Zoom", "Microsoft.Teams" }), "settings round trip");
+var junk = Settings.Parse("garbage\nlang=xx\nhide=\n");
+Check(junk.Lang == "system" && junk.StoreApps && junk.OtherApps && junk.Hidden.Count == 0, "settings defaults");
+var tmpFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "cu-test", "settings.txt");
+st.Save(tmpFile);
+Check(Settings.Load(tmpFile).Hidden.Contains("zoom.zoom"), "settings file + case-insensitive ids");
+Check(Settings.Load("/nonexistent/x.txt").OtherApps, "missing file gives defaults");
+
+// What the list shows
+Check(!st.Shows(new Pkg { Id = "Zoom.Zoom", Source = "winget" }), "hidden app not shown");
+Check(!st.Shows(new Pkg { Id = "9NKSQGP7F2NH", Source = "msstore" }), "store apps switched off");
+Check(st.Shows(new Pkg { Id = "Google.Chrome", Source = "winget" }), "other app shown");
+
+// Error reasons
+Check(Errors.Classify(0, "") == Failure.None, "ok");
+Check(Errors.Classify(unchecked((int)0x8A150101), "") == Failure.InUse, "in use code");
+Check(Errors.Classify(unchecked((int)0x800704C7), "") == Failure.Cancelled, "uac cancelled");
+Check(Errors.Classify(1, "Installer failed: Access is denied.") == Failure.NeedsAdmin, "admin text");
+Check(Errors.Classify(1, "weird") == Failure.Other, "other");
+
+// Language
+Lang.Choice = "tr"; Check(Lang.L("updates", 3) == "3 güncelleme var" && Lang.Pct(45) == "%45", "turkish");
+Lang.Choice = "en"; Check(Lang.L("updates", 3) == "3 updates available" && Lang.Pct(45) == "45%", "english");
+Check(Errors.Message(Failure.Other, unchecked((int)0x8A150011)).Contains("0x8A150011"), "code in message");
+
 Console.WriteLine("parser tests ok");

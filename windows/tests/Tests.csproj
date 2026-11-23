@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../Winget.cs" />
+    <Compile Include="../Core.cs" />
   </ItemGroup>
 </Project>

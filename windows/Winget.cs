@@ -76,6 +76,24 @@ public static class Winget
             if (pct.HasValue) progress(pct.Value);
         });
 
+    /// Same upgrade, started through Windows' "Run as administrator" prompt (UAC). Elevated processes can't
+    /// share their output with us, so there is no percentage here, only the exit code.
+    public static Task<int> UpgradeElevated(Pkg p) => Task.Run(() =>
+    {
+        var psi = new ProcessStartInfo("winget", $"upgrade --id \"{p.Id}\" --exact --silent --accept-package-agreements {Quiet}")
+        {
+            UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden,
+        };
+        try
+        {
+            using (var proc = Process.Start(psi)) { proc.WaitForExit(); return proc.ExitCode; }
+        }
+        catch (System.ComponentModel.Win32Exception e) when (e.NativeErrorCode == 1223) // user said No to UAC
+        {
+            return unchecked((int)0x800704C7);
+        }
+    });
+
     /// Runs winget and streams raw output (progress bars use \r, so line-based reading would miss them).
     static Task<(int, string)> Run(string args, Action<string> onChunk) => Task.Run(() =>
     {
