@@ -76,6 +76,13 @@
   details summary { cursor: pointer; color: var(--text); }
   details[open] summary { margin-bottom: 8px; }
   html { scroll-behavior: smooth; }
+  .table-wrap { overflow-x: auto; }
+  table.features { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; font-size: 15.5px; }
+  .features th, .features td { padding: 14px 18px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+  .features thead th { border-top: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+  .features tbody th { font-weight: 500; width: 40%; }
+  .features td { color: var(--muted); }
+  .features td span { display: block; font-size: 13px; }
   footer { padding: 36px 0 52px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
 
   @media (max-width: 860px) {
@@ -103,7 +110,7 @@
           Windows'a kur
         </a>
       </div>
-      <p class="fine">Ücretsiz · Mac: macOS 13+, Apple Silicon ve Intel · Windows: 10 ve 11 · 50 KB – 600 KB</p>
+      <p class="fine">Ücretsiz · Mac: macOS 13+, Apple Silicon ve Intel · Windows: 10 ve 11 · 60 KB – 600 KB</p>
     </div>
 
     <div class="window" aria-hidden="true">
@@ -124,7 +131,29 @@
     <div class="grid">
       <div class="card"><h3>Her uygulamayı tarar</h3><p>Bilgisayarındaki her uygulamanın yüklü sürümünü okur.</p></div>
       <div class="card"><h3>En son sürümü bulur</h3><p>Mac'te App Store, Homebrew ve uygulamaların kendi güncelleme kanallarına; Windows'ta Microsoft'un winget kataloğuna bakar.</p></div>
-      <div class="card"><h3>Tek tuşla günceller</h3><p>Yüzde ile indirme ilerlemesini gösterir. Açık uygulamaları kapatır, günceller ve tekrar açar.</p></div>
+      <div class="card"><h3>Tek tuşla günceller</h3><p>Hepsini birden ya da tek tek günceller, indirmeyi yüzde ile gösterir. Bir şey ters giderse sebebini ve ne yapacağını söyler.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="ozellikler">
+  <div class="wrap">
+    <h2>Mac ve Windows'ta aynı özellikler</h2>
+    <div class="table-wrap">
+      <table class="features">
+        <thead><tr><th scope="col"></th><th scope="col">Mac</th><th scope="col">Windows</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Açılışta ya da <b>Kontrol Et</b> ile tüm uygulamaları kontrol eder</th><td>✓</td><td>✓</td></tr>
+          <tr><th scope="row"><b>Hepsini Güncelle</b> ya da tek tek güncelleme</th><td>✓</td><td>✓ <span>çift tık ya da sağ tık</span></td></tr>
+          <tr><th scope="row">İndirme yüzdesi ve dönen çark</th><td>✓</td><td>✓</td></tr>
+          <tr><th scope="row">Hata olursa sebebi ve çözüm butonu</th><td>✓</td><td>✓</td></tr>
+          <tr><th scope="row">Şifre / yönetici izni isteyen uygulamalar</th><td>Mac şifresini hemen sorar</td><td>Sağ tık → <b>Yönetici Olarak Dene</b></td></tr>
+          <tr><th scope="row">İstemediğin uygulamayı listeden kaldırma</th><td>Sağ tık → <b>Listeden Kaldır</b></td><td>Sağ tık → <b>Listeden Kaldır</b></td></tr>
+          <tr><th scope="row">Ayarlar: neler kontrol edilsin</th><td>App Store / internetten indirilenler, uygulama bazında</td><td>Microsoft Store / diğer uygulamalar, kaldırılanlar</td></tr>
+          <tr><th scope="row">Türkçe ve İngilizce</th><td>✓</td><td>✓</td></tr>
+          <tr><th scope="row">En son sürümü nereden bulur</th><td>App Store, Homebrew ve uygulamanın kendi güncelleme kanalı; en yenisi kazanır</td><td>Windows'un winget kataloğu ve Microsoft Store</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
@@ -155,7 +184,7 @@
         <div class="cmd"><pre id="cmd-win">irm https://check-updates.armanalis.workers.dev/install.ps1 | iex</pre><button type="button" data-copy="cmd-win">Kopyala</button></div></div></li>
       <li><div>Check Updates kendiliğinden açılır. Sonraki açılışlarda Başlat menüsünde "Check Updates" yazman yeterli. Bazı uygulamalar güncellenirken yönetici izni ister, <b>Evet</b> de.</div></li>
     </ol>
-    <p class="note">Windows 10 ve 11'de hazır gelen winget'i kullanır. Komutun ne yaptığını <a href="install.ps1" style="color:var(--green)">buradan okuyabilirsin</a>.</p>
+    <p class="note">Windows 10 ve 11'de hazır gelen winget'i kullanır. Bir güncelleme yönetici izni isterse satıra sağ tıklayıp <b>Yönetici Olarak Dene</b>'yi seç; Windows izin penceresini açar. Komutun ne yaptığını <a href="install.ps1" style="color:var(--green)">buradan okuyabilirsin</a>.</p>
     <details class="note"><summary>PowerShell kullanmadan kurmak istersen</summary>
       <a href="CheckUpdates.exe" download style="color:var(--green)">CheckUpdates.exe</a>'yi indir ve çift tıkla. "Windows bilgisayarınızı korudu" çıkarsa
       <b>Ek bilgi</b> → <b>Yine de çalıştır</b>'a bas.</details>
