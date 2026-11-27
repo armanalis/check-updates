@@ -31,13 +31,13 @@
 
 ## Install / Kurulum
 
-**Mac** (macOS 13+, Apple Silicon and Intel) — open Terminal and run:
+**Mac** (macOS 13+, Apple Silicon and Intel) — open Terminal and run ([step by step on the website](https://check-updates.armanalis.workers.dev/#mac)):
 
 ```bash
 curl -fsSL https://check-updates.armanalis.workers.dev/install.sh | sh
 ```
 
-**Windows** (Windows 10 and 11) — open PowerShell (no admin needed) and run:
+**Windows** (Windows 10 and 11) — open PowerShell (no admin needed) and run ([step by step on the website](https://check-updates.armanalis.workers.dev/#windows)):
 
 ```powershell
 irm https://check-updates.armanalis.workers.dev/install.ps1 | iex
@@ -63,7 +63,7 @@ Prefer a plain download? Get [`CheckUpdates.zip`](https://check-updates.armanali
 
 | | Mac | Windows |
 |---|---|---|
-| Finds latest versions | App Store, [Homebrew](https://brew.sh) cask catalog, and the app's own update feed (Sparkle feed from Info.plist or found inside the app, electron-builder `app-update.yml`). The newest answer wins. | [winget](https://learn.microsoft.com/windows/package-manager/winget/), Windows' built-in package manager (`winget upgrade`): the winget catalog and the Microsoft Store |
+| Finds latest versions | App Store, [Homebrew](https://brew.sh) cask catalog, and the app's own update feed (Sparkle feed from Info.plist or found inside the app, electron-builder `app-update.yml`). The newest answer wins. App Store apps are compared by their short version only, since the build number (Office: `16.115.26110837`) is not what the store reports. | [winget](https://learn.microsoft.com/windows/package-manager/winget/), Windows' built-in package manager (`winget upgrade --include-unknown`): the winget catalog and the Microsoft Store, including apps whose installed version winget can't read (shown as `Unknown`) |
 | Updates | `brew install --cask --force`, App Store, or the app's own updater | `winget upgrade --id <app> --silent`, elevated through UAC when needed |
 | Settings stored in | macOS user defaults (`com.armanalis.checkupdates`) | `%APPDATA%\CheckUpdates\settings.txt` |
 | Installed to | `/Applications` (or `~/Applications`) | `%LOCALAPPDATA%\Programs\CheckUpdates`, with a Start menu shortcut |
