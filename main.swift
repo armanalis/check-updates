@@ -87,6 +87,9 @@ struct AppInfo: Identifiable {
     // shortcut: an app whose short version lacks a patch number (e.g. "1.2" + build "500") can hide a "1.2.1" update; fine for real-world apps.
     var hasUpdate: Bool {
         guard let l = latest else { return false }
+        // the App Store reports the same short version the app shows, so the build number must not count
+        // (Excel: 16.115 + build 16.115.26110837 would hide store version 16.115.2)
+        if source == .appStore { return isNewer(l, than: version) }
         var installed = [version, "\(version).\(build)"]
         // some apps keep the full version only in the build number (Opera: "140.0" + "140.0.6074.36")
         // only when the build extends the short version ("140.0" → "140.0.6074.36"), not Prime Video's "10.157" + "10.15700.144"
@@ -815,6 +818,10 @@ func selfTest() {
     var pv = AppInfo(name: "Prime Video", url: URL(fileURLWithPath: "/x"), bundleID: "p", version: "10.157", build: "10.15700.144", isMAS: true, feedURL: nil)
     pv.latest = "10.158"; precondition(pv.hasUpdate)
     pv.latest = "10.157"; precondition(!pv.hasUpdate)
+    var xl = AppInfo(name: "Excel", url: URL(fileURLWithPath: "/x"), bundleID: "e", version: "16.115", build: "16.115.26110837", isMAS: true, feedURL: nil)
+    xl.source = .appStore
+    xl.latest = "16.115.2"; precondition(xl.hasUpdate)
+    xl.latest = "16.115"; precondition(!xl.hasUpdate)
     var zm = AppInfo(name: "zoom", url: URL(fileURLWithPath: "/x"), bundleID: "z", version: "7.2.5 (90525)", build: "7.2.5.90525", isMAS: false, feedURL: nil)
     zm.latest = "7.2.5.90525"; precondition(!zm.hasUpdate)
     zm.latest = "7.3.0.1"; precondition(zm.hasUpdate)
