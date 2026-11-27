@@ -29,6 +29,14 @@ var tr = "Ad              Kimlik            Sürüm     Kullanılabilir  Kaynak\
 var b = Winget.ParseUpgradeTable(tr);
 Check(b.Count == 2 && b[1].Id == "Ollama.Ollama" && b[1].Available == "0.40.17" && b[0].Source == "msstore", "tr");
 
+// --include-unknown rows: installed version "Unknown" (or "< 16.0") must still be listed
+var unk = Winget.ParseUpgradeTable(
+    "Name                 Id                     Version  Available         Source\n" +
+    "------------------------------------------------------------------------------\n" +
+    "Microsoft 365 Apps   Microsoft.Office       Unknown  16.0.18227.20162  winget\n" +
+    "Zoom Workplace       Zoom.Zoom              < 6.2    6.3.0.52884       winget\n");
+Check(unk.Count == 2 && unk[0].Version == "Unknown" && unk[1].Version == "< 6.2" && unk[1].Available == "6.3.0.52884", "unknown versions");
+
 Check(Winget.ParseUpgradeTable("No installed package found matching input criteria.").Count == 0, "empty");
 
 // Progress: percent bar, then size bar wins because it comes later

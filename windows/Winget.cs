@@ -18,7 +18,9 @@ public class Pkg
 
 public static class Winget
 {
-    const string Quiet = "--accept-source-agreements --disable-interactivity";
+    // --include-unknown: without it winget hides apps whose installed version it can't read (often Office and
+    // Store apps), so they looked up to date while an update was out (same miss as Excel on the Mac)
+    const string Quiet = "--accept-source-agreements --disable-interactivity --include-unknown";
 
     /// Parses every table in `winget upgrade` output. Headers are localized ("Name"/"Ad"), so columns
     /// are located by the positions of the header words, not their text.
